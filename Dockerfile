@@ -10,14 +10,14 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 WORKDIR /app
 
 # Copy project files
-COPY pyproject.toml ./
+COPY pyproject.toml uv.lock ./
 COPY *.py ./
 COPY log/ ./log/
 COPY mqtt/ ./mqtt/
 COPY test/ ./test/
 
-# Install dependencies using uv
-RUN uv sync --no-dev --no-install-project
+# Install dependencies using uv (frozen to ensure reproducibility)
+RUN uv sync --frozen --no-dev --no-install-project
 
 # Create a non-root user for security
 RUN useradd --create-home --shell /bin/bash dsmr && \
