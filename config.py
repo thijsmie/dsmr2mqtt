@@ -30,7 +30,10 @@ def _get_int_env(name, default):
     value = os.environ.get(name)
     if value is None:
         return default
-    return int(value)
+    try:
+        return int(value)
+    except ValueError:
+        return default
 
 
 # [ LOGLEVELS ]

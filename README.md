@@ -201,7 +201,6 @@ The Docker container can be configured using the following environment variables
 ### Docker Compose Example
 
 ```yaml
-version: '3.8'
 services:
   dsmr2mqtt:
     image: ghcr.io/thijsmie/dsmr2mqtt:latest
