@@ -50,7 +50,7 @@ import string
 import socket
 import paho.mqtt.client as mqtt_client
 import paho.mqtt as paho_mqtt
-from pkg_resources import parse_version
+from packaging.version import Version
 
 # Logging
 import __main__
@@ -128,19 +128,23 @@ class MQTTClient(threading.Thread):
     # Check if installed paho-mqtt version supports MQTT v5
     # Demote to v311 if wrong version is installed
     if self.__mqtt_protocol == mqtt_client.MQTTv5:
-      if parse_version(f"{paho_mqtt.__version__}") < parse_version("1.5.1"):
+      if Version(f"{paho_mqtt.__version__}") < Version("1.5.1"):
         logger.warning(f"Incorrect paho-mqtt version ({paho_mqtt.__version__}) to support MQTT v5, "
                        f"reverting to MQTT v311")
         self.__mqtt_protocol = mqtt_client.MQTTv311
 
     # clean_session is only implemented for MQTT v3
     if self.__mqtt_protocol == mqtt_client.MQTTv311 or self.__mqtt_protocol == mqtt_client.MQTTv31:
-      self.__mqtt = mqtt_client.Client(self.__mqtt_client_id,
-                                       clean_session=mqtt_cleansession,
-                                       protocol=self.__mqtt_protocol)
+      self.__mqtt = mqtt_client.Client(
+          callback_api_version=mqtt_client.CallbackAPIVersion.VERSION2,
+          client_id=self.__mqtt_client_id,
+          clean_session=mqtt_cleansession,
+          protocol=self.__mqtt_protocol)
     elif self.__mqtt_protocol == mqtt_client.MQTTv5:
-      self.__mqtt = mqtt_client.Client(self.__mqtt_client_id,
-                                       protocol=self.__mqtt_protocol)
+      self.__mqtt = mqtt_client.Client(
+          callback_api_version=mqtt_client.CallbackAPIVersion.VERSION2,
+          client_id=self.__mqtt_client_id,
+          protocol=self.__mqtt_protocol)
     else:
       logger.error(f"Unknown MQTT protocol version {mqtt_protocol}....exit")
       self.__worker_threads_stopper.set()
@@ -244,15 +248,15 @@ class MQTTClient(threading.Thread):
     self.__connected_flag = flag
     return
 
-  def __on_connect(self, _client, userdata, flags, rc, _properties=None):
+  def __on_connect(self, _client, userdata, connect_flags, reason_code, _properties=None):
     """
     Callback: when the client receives a CONNACK response from the broker.
 
     Args:
       :param ? _client: the client instance for this callback
       :param ? userdata: the private user data as set in Client()
-      :param dict flags: response flags sent by the broker
-      :param int rc: the connection result --> connack_dict
+      :param ConnectFlags connect_flags: response flags sent by the broker
+      :param ReasonCode reason_code: the connection result
       :param _properties: The MQTT v5.0 properties received from the broker.  A
               list of Properties class instances.
 
@@ -260,8 +264,11 @@ class MQTTClient(threading.Thread):
       None
     """
     logger.debug(f">>")
-    if rc == mqtt_client.CONNACK_ACCEPTED:
-      logger.debug(f"Connected: userdata={userdata}; flags={flags}; rc={rc}: {mqtt_client.connack_string(rc)}")
+    if reason_code.is_failure:
+      logger.error(f"userdata={userdata}; flags={connect_flags}; reason_code={reason_code}")
+      self.__set_connected_flag(False)
+    else:
+      logger.debug(f"Connected: userdata={userdata}; flags={connect_flags}; reason_code={reason_code}")
       self.__set_connected_flag(True)
       self.__set_status()
 
@@ -270,28 +277,25 @@ class MQTTClient(threading.Thread):
         logger.debug(f"Resubscribe topic: {topic}")
         self.__mqtt.subscribe(topic, self.__qos)
 
-    else:
-      logger.error(f"userdata={userdata}; flags={flags}; rc={rc}: {mqtt_client.connack_string(rc)}")
-      self.__set_connected_flag(False)
-
-  def __on_disconnect(self, _client, userdata, rc, _properties=None):
+  def __on_disconnect(self, _client, userdata, disconnect_flags, reason_code, _properties=None):
     """
     Callback: called when the client disconnects from the broker.
 
     Args:
       :param ? _client: the client instance for this callback
       :param ? userdata: the private user data as set in Client()
-      :param int rc: the disconnection result --> rc_dict
+      :param DisconnectFlags disconnect_flags: the disconnection flags
+      :param ReasonCode reason_code: the disconnection result
       :param _properties: The MQTT v5.0 properties received from the broker.  A
               list of Properties class instances.
 
     Returns:
       None
     """
-    if rc != mqtt_client.MQTT_ERR_SUCCESS:
-      logger.warning(f"Unexpected disconnect, userdata = {userdata}; rc = {rc}: {mqtt_client.error_string(rc)}")
+    if reason_code.is_failure:
+      logger.warning(f"Unexpected disconnect, userdata = {userdata}; reason_code = {reason_code}")
     else:
-      logger.info(f"Expected disconnect, userdata = {userdata}; rc = {rc}: {mqtt_client.error_string(rc)}")
+      logger.info(f"Expected disconnect, userdata = {userdata}; reason_code = {reason_code}")
 
     self.__set_connected_flag(False)
     return
@@ -311,7 +315,7 @@ class MQTTClient(threading.Thread):
     if self.__message_trigger is not None:
       self.__message_trigger.set()
 
-  def __on_publish(self, _client, userdata, mid):
+  def __on_publish(self, _client, userdata, mid, reason_code, _properties=None):
     """
     Callback: when a message that was to be sent using the publish() call has completed transmission to the broker.
 
@@ -319,19 +323,21 @@ class MQTTClient(threading.Thread):
       :param ? _client: the client instance for this callback
       :param ? userdata: the private user data as set in Client()
       :param ? mid: matches the mid-variable returned from the corresponding publish()
+      :param ReasonCode reason_code: the MQTT v5.0 reason code
+      :param _properties: The MQTT v5.0 properties received from the broker.
 
     Returns:
       None
     """
-    logger.debug(f"userdata={userdata}; mid={mid}")
+    logger.debug(f"userdata={userdata}; mid={mid}; reason_code={reason_code}")
     return None
 
-  def __on_subscribe_v5(self, _client, _userdata, mid, reasoncodes, _properties=None):
+  def __on_subscribe_v5(self, _client, _userdata, mid, reason_codes, _properties=None):
     """
     :param _client: The client instance for this callback
     :param _userdata: The private user data as set in Client() or userdata_set()
     :param mid: Matches the mid-variable returned from the corresponding subscribe() call.
-    :param reasoncodes: The MQTT v5.0 reason codes received from the broker for each
+    :param reason_codes: The MQTT v5.0 reason codes received from the broker for each
                         subscription.  A list of ReasonCodes instances.
     :param _properties: The MQTT v5.0 properties received from the broker.  A
                       list of Properties class instances.
@@ -339,29 +345,30 @@ class MQTTClient(threading.Thread):
     """
     logger.debug(f"Subscribed mid variable: {mid}")
 
-    for rc in reasoncodes:
+    for rc in reason_codes:
       logger.debug(f"reasonCode = {rc}")
 
-  def __on_subscribe_v31(self, _client, _userdata, mid, granted_qos):
+  def __on_subscribe_v31(self, _client, _userdata, mid, reason_codes, _properties=None):
     """
     :param _client:
     :param _userdata:
     :param mid:
-    :param granted_qos: list of integers that give the QoS level the broker has
+    :param reason_codes: list of ReasonCode instances that give the QoS level the broker has
                         granted for each of the different subscription requests.
+    :param _properties: The MQTT v5.0 properties received from the broker.
     :return:
     """
     logger.debug(f"Subscribed mid variable: {mid}")
 
-    for qos in granted_qos:
-      logger.debug(f"Granted QoS = {qos}")
+    for rc in reason_codes:
+      logger.debug(f"Granted QoS = {rc}")
 
-  def __on_unsubscribe(self, _client, _userdata, mid, _properties=None, _reasoncode=None):
+  def __on_unsubscribe(self, _client, _userdata, mid, reason_codes, _properties=None):
     """
     :param _client:
     :param _userdata:
     :param mid:
-    :param _reasoncode:
+    :param reason_codes: list of ReasonCode instances.
     :param _properties: The MQTT v5.0 properties received from the broker.  A
            list of Properties class instances.
     :return:
