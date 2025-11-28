@@ -166,14 +166,32 @@ The Docker container can be configured using the following environment variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MQTT_BROKER` | `192.168.1.1` | MQTT broker IP address or hostname |
-| `MQTT_PORT` | `1883` | MQTT broker port |
+| `MQTT_URL` | (empty) | MQTT connection URL. Supports `mqtt://`, `mqtts://`, `ws://`, `wss://` schemes. When set, takes precedence over `MQTT_BROKER` and `MQTT_PORT`. Examples: `mqtt://broker:1883`, `wss://broker:443/mqtt` |
+| `MQTT_BROKER` | `192.168.1.1` | MQTT broker IP address or hostname (used when `MQTT_URL` is not set) |
+| `MQTT_PORT` | `1883` | MQTT broker port (used when `MQTT_URL` is not set) |
 | `MQTT_CLIENT_ID` | `mqtt-dsmr` | Unique MQTT client identifier |
 | `MQTT_QOS` | `1` | MQTT Quality of Service (0, 1, or 2) |
 | `MQTT_USERNAME` | (empty) | MQTT authentication username |
 | `MQTT_PASSWORD` | (empty) | MQTT authentication password |
 | `MQTT_MAXRATE` | `60` | Max MQTT messages per hour (1-3600). Examples: 1=hourly, 12=every 5min, 60=every 1min, 720=every 5sec |
 | `MQTT_TOPIC_PREFIX` | `dsmr` | MQTT topic prefix for all messages |
+
+#### MQTT URL Schemes
+
+The `MQTT_URL` environment variable supports the following schemes:
+
+| Scheme | Transport | Default Port | TLS |
+|--------|-----------|--------------|-----|
+| `mqtt://` | TCP | 1883 | No |
+| `mqtts://` | TCP | 8883 | Yes |
+| `ws://` | WebSocket | 80 | No |
+| `wss://` | WebSocket | 443 | Yes |
+
+Examples:
+- `mqtt://192.168.1.1:1883` - Standard MQTT over TCP
+- `mqtts://broker.example.com:8883` - MQTT over TLS
+- `ws://broker.example.com:8080/mqtt` - MQTT over WebSocket
+- `wss://broker.example.com:443/mqtt` - MQTT over WebSocket Secure
 
 ### Home Assistant Configuration
 
@@ -211,6 +229,26 @@ services:
     environment:
       - MQTT_BROKER=192.168.1.1
       - MQTT_PORT=1883
+      - MQTT_USERNAME=myuser
+      - MQTT_PASSWORD=mypassword
+      - MQTT_TOPIC_PREFIX=dsmr
+      - HA_DISCOVERY=true
+      - SERIAL_PORT=/dev/ttyUSB0
+      - DSMR_LOGLEVEL=INFO
+```
+
+#### Docker Compose with WebSocket Example
+
+```yaml
+services:
+  dsmr2mqtt:
+    image: ghcr.io/thijsmie/dsmr2mqtt:latest
+    container_name: dsmr2mqtt
+    restart: unless-stopped
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+    environment:
+      - MQTT_URL=wss://broker.example.com:443/mqtt
       - MQTT_USERNAME=myuser
       - MQTT_PASSWORD=mypassword
       - MQTT_TOPIC_PREFIX=dsmr

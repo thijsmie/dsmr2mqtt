@@ -102,7 +102,10 @@ t_mqtt = mqtt.MQTTClient(mqtt_broker=cfg.MQTT_BROKER,
                          username=cfg.MQTT_USERNAME,
                          password=cfg.MQTT_PASSWORD,
                          mqtt_stopper=t_mqtt_stopper,
-                         worker_threads_stopper=t_threads_stopper)
+                         worker_threads_stopper=t_threads_stopper,
+                         transport=cfg.MQTT_TRANSPORT,
+                         use_tls=cfg.MQTT_USE_TLS,
+                         ws_path=cfg.MQTT_WS_PATH)
 
 # SerialPort thread
 telegram = list()
