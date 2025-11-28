@@ -32,10 +32,35 @@ A typical MQTT message broadcast looks like:
 A virtual DSMR parameter is implemented (el_consumed and el_returned, which is sum of tarif1 and tarif2 (night/low en day/normal tariff)) - as some have a dual tarif meter, while energy company administratively considers this as a mono tarif meter.
 
 ## Requirements
-Install following python3 libraries
+This project requires Python 3.13 or later.
+
+### Using uv (recommended)
+Install [uv](https://docs.astral.sh/uv/) and run:
+```bash
+uv sync
+```
+
+### Using pip
+Install the following python3 libraries:
 * paho-mqtt
 * pyserial
 * persist-queue
+* packaging
+
+### Using Docker
+Pull the image from GitHub Container Registry:
+```bash
+docker pull ghcr.io/thijsmie/dsmr2mqtt:latest
+```
+
+Run with Docker:
+```bash
+docker run -d \
+  --name dsmr2mqtt \
+  --device=/dev/ttyUSB0 \
+  -v /path/to/config.py:/app/config.py:ro \
+  ghcr.io/thijsmie/dsmr2mqtt:latest
+```
 
 ## Test the P1 adapter & USB connection:
 Test if P1 adapter is functional and is providing dsmr data by running in a bash shell:
@@ -59,10 +84,43 @@ Test if P1 adapter is functional and is providing dsmr data by running in a bash
   ```
 
 ## Installation & Configuration
-* Install Python3 packages per recommendation for your distro
+
+### Option 1: Using uv (recommended)
+```bash
+# Clone the repository
+git clone https://github.com/thijsmie/dsmr2mqtt.git
+cd dsmr2mqtt/
+
+# Install dependencies with uv
+uv sync
+
+# Copy and configure
+cp config.rename.py config.py
+# Edit config.py with your MQTT settings
+
+# Run the application
+uv run python dsmr-mqtt.py
+```
+
+### Option 2: Using Docker
+```bash
+# Copy and configure
+cp config.rename.py config.py
+# Edit config.py with your MQTT settings
+
+# Run with Docker
+docker run -d \
+  --name dsmr2mqtt \
+  --device=/dev/ttyUSB0 \
+  -v $(pwd)/config.py:/app/config.py:ro \
+  ghcr.io/thijsmie/dsmr2mqtt:latest
+```
+
+### Option 3: Traditional Installation
+* Install Python 3.13+ and packages per recommendation for your distro
 * Install from github and configure:
   * mkdir & cd to your install location 
-  * git clone https://github.com/hansij66/dsmr2mqtt.git
+  * git clone https://github.com/thijsmie/dsmr2mqtt.git
   * cd dsmr2mqtt/ 
 * In `systemd/dsmr-mqtt.service`:
   * Adapt ExecStart under [Service] to ExecStart=/<your location>/dsmr-mqtt.py (default: `/opt/iot/dsmr`)
