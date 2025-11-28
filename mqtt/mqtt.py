@@ -17,9 +17,9 @@
   V1.1.5: Fix MQTT_ERR_NOMEM
   v1.1.6: Add clean session
   v2.0.0: Parameterize clean session; remove mqtt-rate
+  v2.1.0: Add WebSocket transport support (ws://, wss://)
 
   LIMITATIONS
-  * Only transport = TCP supported; websockets is not supported
   * Clean_session and clean-start partially implemented (not relevant for publishing clients)
 
   Class ReasonCodes:
@@ -43,6 +43,7 @@
 
 """
 
+import ssl
 import time
 import threading
 import random
@@ -78,7 +79,10 @@ class MQTTClient(threading.Thread):
                mqtt_protocol=mqtt_client.MQTTv311,
                username="",
                password="",
-               worker_threads_stopper=None):
+               worker_threads_stopper=None,
+               transport="tcp",
+               use_tls=False,
+               ws_path=None):
 
     """
     Args:
@@ -95,6 +99,9 @@ class MQTTClient(threading.Thread):
       :param threading.Event() worker_threads_stopper: stopper event for other worker threads;
       typically the worker threads are
              stopped in the main loop before the mqtt thread;but mqtt thread can also set this in case of failure
+      :param str transport: "tcp" or "websockets"
+      :param bool use_tls: Enable TLS/SSL for the connection
+      :param str ws_path: WebSocket path (only used when transport="websockets")
 
     Returns:
       None
@@ -106,6 +113,9 @@ class MQTTClient(threading.Thread):
     self.__mqtt_broker = mqtt_broker
     self.__mqtt_stopper = mqtt_stopper
     self.__mqtt_port = mqtt_port
+    self.__transport = transport
+    self.__use_tls = use_tls
+    self.__ws_path = ws_path
 
     # Generate random client id if not specified;
     # Basename ('script', from log module) and extended with 10 random characters
@@ -115,6 +125,7 @@ class MQTTClient(threading.Thread):
       self.__mqtt_client_id = mqtt_client_id
 
     logger.info(f"MQTT Client ID = {self.__mqtt_client_id}")
+    logger.info(f"MQTT Transport = {self.__transport}, TLS = {self.__use_tls}")
 
     self.__qos = mqtt_qos
     self.__mqtt_cleansession = mqtt_cleansession
@@ -139,17 +150,29 @@ class MQTTClient(threading.Thread):
           callback_api_version=mqtt_client.CallbackAPIVersion.VERSION2,
           client_id=self.__mqtt_client_id,
           clean_session=mqtt_cleansession,
-          protocol=self.__mqtt_protocol)
+          protocol=self.__mqtt_protocol,
+          transport=self.__transport)
     elif self.__mqtt_protocol == mqtt_client.MQTTv5:
       self.__mqtt = mqtt_client.Client(
           callback_api_version=mqtt_client.CallbackAPIVersion.VERSION2,
           client_id=self.__mqtt_client_id,
-          protocol=self.__mqtt_protocol)
+          protocol=self.__mqtt_protocol,
+          transport=self.__transport)
     else:
       logger.error(f"Unknown MQTT protocol version {mqtt_protocol}....exit")
       self.__worker_threads_stopper.set()
       self.__mqtt_stopper.set()
       return
+
+    # Configure TLS if enabled
+    if self.__use_tls:
+      self.__mqtt.tls_set(cert_reqs=ssl.CERT_REQUIRED, tls_version=ssl.PROTOCOL_TLS)
+      logger.info("TLS enabled for MQTT connection")
+
+    # Configure WebSocket path if using websockets transport
+    if self.__transport == "websockets" and self.__ws_path:
+      self.__mqtt.ws_set_options(path=self.__ws_path)
+      logger.info(f"WebSocket path set to: {self.__ws_path}")
 
     # Indicate whether thread has started - run() has been called
     self.__run = False

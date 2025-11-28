@@ -27,6 +27,9 @@ USER dsmr
 
 # Environment variables with defaults
 # MQTT Configuration
+# Use MQTT_URL for URL-style configuration (mqtt://, mqtts://, ws://, wss://)
+# If MQTT_URL is set, it takes precedence over MQTT_BROKER and MQTT_PORT
+ENV MQTT_URL=""
 ENV MQTT_BROKER="192.168.1.1"
 ENV MQTT_PORT="1883"
 ENV MQTT_CLIENT_ID="mqtt-dsmr"

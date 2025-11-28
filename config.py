@@ -15,6 +15,7 @@
 """
 
 import os
+from urllib.parse import urlparse
 
 
 def _get_bool_env(name, default):
@@ -36,6 +37,41 @@ def _get_int_env(name, default):
         return default
 
 
+def _parse_mqtt_url(url):
+    """
+    Parse an MQTT URL and return connection parameters.
+
+    Supported URL schemes:
+    - mqtt://host:port - TCP connection (default port 1883)
+    - ws://host:port - WebSocket connection (default port 80)
+    - wss://host:port - WebSocket Secure connection (default port 443)
+
+    Returns:
+        tuple: (host, port, transport, use_tls)
+    """
+    parsed = urlparse(url)
+    scheme = parsed.scheme.lower()
+
+    # Map scheme to transport and defaults
+    scheme_config = {
+        'mqtt': {'transport': 'tcp', 'default_port': 1883, 'use_tls': False},
+        'mqtts': {'transport': 'tcp', 'default_port': 8883, 'use_tls': True},
+        'ws': {'transport': 'websockets', 'default_port': 80, 'use_tls': False},
+        'wss': {'transport': 'websockets', 'default_port': 443, 'use_tls': True},
+    }
+
+    if scheme not in scheme_config:
+        raise ValueError(f"Unsupported MQTT URL scheme: {scheme}. "
+                         f"Supported schemes: mqtt://, mqtts://, ws://, wss://")
+
+    config = scheme_config[scheme]
+    host = parsed.hostname or '192.168.1.1'
+    port = parsed.port or config['default_port']
+    path = parsed.path if parsed.path else None
+
+    return host, port, config['transport'], config['use_tls'], path
+
+
 # [ LOGLEVELS ]
 # DEBUG, INFO, WARNING, ERROR, CRITICAL
 loglevel = os.environ.get("DSMR_LOGLEVEL", "INFO")
@@ -53,9 +89,30 @@ PRODUCTION = _get_bool_env("DSMR_PRODUCTION", True)
 SIMULATORFILE = os.environ.get("DSMR_SIMULATORFILE", "test/dsmr.raw")
 
 # [ MQTT Parameters ]
+# MQTT_URL: Use URL-style configuration for MQTT connections
+# Supported schemes:
+# - mqtt://host:port - TCP connection (default port 1883)
+# - mqtts://host:port - TCP with TLS (default port 8883)
+# - ws://host:port/path - WebSocket connection (default port 80)
+# - wss://host:port/path - WebSocket Secure connection (default port 443)
+# If MQTT_URL is not set, MQTT_BROKER and MQTT_PORT are used for backward compatibility
+MQTT_URL = os.environ.get("MQTT_URL", "")
+
+# Legacy broker configuration (used when MQTT_URL is not set)
 # Using local dns names is not always reliable with PAHO
-MQTT_BROKER = os.environ.get("MQTT_BROKER", "192.168.1.1")
-MQTT_PORT = _get_int_env("MQTT_PORT", 1883)
+_MQTT_BROKER_DEFAULT = os.environ.get("MQTT_BROKER", "192.168.1.1")
+_MQTT_PORT_DEFAULT = _get_int_env("MQTT_PORT", 1883)
+
+# Parse MQTT URL or use legacy configuration
+if MQTT_URL:
+    MQTT_BROKER, MQTT_PORT, MQTT_TRANSPORT, MQTT_USE_TLS, MQTT_WS_PATH = _parse_mqtt_url(MQTT_URL)
+else:
+    MQTT_BROKER = _MQTT_BROKER_DEFAULT
+    MQTT_PORT = _MQTT_PORT_DEFAULT
+    MQTT_TRANSPORT = "tcp"
+    MQTT_USE_TLS = False
+    MQTT_WS_PATH = None
+
 MQTT_CLIENT_UNIQ_ID = os.environ.get("MQTT_CLIENT_ID", "mqtt-dsmr")
 MQTT_QOS = _get_int_env("MQTT_QOS", 1)
 MQTT_USERNAME = os.environ.get("MQTT_USERNAME", "")
