@@ -25,5 +25,30 @@ RUN useradd --create-home --shell /bin/bash dsmr && \
 
 USER dsmr
 
+# Environment variables with defaults
+# MQTT Configuration
+ENV MQTT_BROKER="192.168.1.1"
+ENV MQTT_PORT="1883"
+ENV MQTT_CLIENT_ID="mqtt-dsmr"
+ENV MQTT_QOS="1"
+ENV MQTT_USERNAME=""
+ENV MQTT_PASSWORD=""
+ENV MQTT_MAXRATE="60"
+ENV MQTT_TOPIC_PREFIX="dsmr"
+
+# Home Assistant Configuration
+ENV HA_DISCOVERY="true"
+ENV HA_DELETECONFIG="true"
+ENV HA_DISCOVERY_RATE="12"
+
+# Serial Port Configuration
+ENV SERIAL_PORT="/dev/ttyUSB0"
+ENV SERIAL_BAUDRATE="115200"
+
+# Application Configuration
+ENV DSMR_LOGLEVEL="INFO"
+ENV DSMR_PRODUCTION="true"
+ENV DSMR_SIMULATORFILE="test/dsmr.raw"
+
 # Run the application
 CMD ["uv", "run", "python", "dsmr-mqtt.py"]

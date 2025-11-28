@@ -53,12 +53,14 @@ Pull the image from GitHub Container Registry:
 docker pull ghcr.io/thijsmie/dsmr2mqtt:latest
 ```
 
-Run with Docker:
+Run with Docker using environment variables:
 ```bash
 docker run -d \
   --name dsmr2mqtt \
   --device=/dev/ttyUSB0 \
-  -v /path/to/config.py:/app/config.py:ro \
+  -e MQTT_BROKER=192.168.1.1 \
+  -e MQTT_USERNAME=myuser \
+  -e MQTT_PASSWORD=mypassword \
   ghcr.io/thijsmie/dsmr2mqtt:latest
 ```
 
@@ -94,27 +96,26 @@ cd dsmr2mqtt/
 # Install dependencies with uv
 uv sync
 
-# Copy and configure
-cp config.rename.py config.py
-# Edit config.py with your MQTT settings
+# Option A: Use environment variables (recommended)
+MQTT_BROKER=192.168.1.1 MQTT_USERNAME=myuser MQTT_PASSWORD=mypassword uv run python dsmr-mqtt.py
 
-# Run the application
-uv run python dsmr-mqtt.py
+# Option B: Edit config.py directly with your MQTT settings
+# uv run python dsmr-mqtt.py
 ```
 
-### Option 2: Using Docker
+### Option 2: Using Docker with Environment Variables
 ```bash
-# Copy and configure
-cp config.rename.py config.py
-# Edit config.py with your MQTT settings
-
-# Run with Docker
+# Run with Docker using environment variables
 docker run -d \
   --name dsmr2mqtt \
   --device=/dev/ttyUSB0 \
-  -v $(pwd)/config.py:/app/config.py:ro \
+  -e MQTT_BROKER=192.168.1.1 \
+  -e MQTT_USERNAME=myuser \
+  -e MQTT_PASSWORD=mypassword \
   ghcr.io/thijsmie/dsmr2mqtt:latest
 ```
+
+See the [Environment Variables](#environment-variables) section for all available options.
 
 ### Option 3: Traditional Installation
 * Install Python 3.13+ and packages per recommendation for your distro
@@ -125,8 +126,8 @@ docker run -d \
 * In `systemd/dsmr-mqtt.service`:
   * Adapt ExecStart under [Service] to ExecStart=/<your location>/dsmr-mqtt.py (default: `/opt/iot/dsmr`)
 * sudo cp -p systemd/dsmr-mqtt.service /etc/systemd/system
-* Copy `config.rename.py` to `config.py` and adapt for your configuration (minimal: mqtt ip, username, password)
-  * Edit the MQTT configuration and know that the MQTT_TOPIC_PREFIX = "dsmr" will show these messages as topic dsmr/. Configuration will be shown as homeassistant/sensor/dsmr/
+* Set environment variables in `systemd/dsmr-mqtt.service` or edit `config.py` directly for your configuration (minimal: MQTT broker, username, password)
+  * The MQTT_TOPIC_PREFIX (default: "dsmr") determines the topic prefix. Messages appear as `dsmr/...` and Home Assistant config as `homeassistant/sensor/dsmr/...`
 
 * `sudo systemctl enable dsmr-mqtt`
 * `sudo systemctl start dsmr-mqtt`
@@ -148,7 +149,7 @@ Use
 to test &  inspect MQTT messages
 
 A `test/dsmr.raw` simulation file is provided.
-Set `PRODUCTION = False` in `config.py` to use the simulation file. No P1/serial connection is required.
+Set `DSMR_PRODUCTION=false` environment variable (or `PRODUCTION = False` in `config.py`) to use the simulation file. No P1/serial connection is required.
 
 Tested under Debian/Raspbian.
 Tested with DSMR v5.0 meter in Netherlands and Belgium. For other DSMR versions, `dsmr50.py` needs to be adapted.
@@ -156,6 +157,68 @@ For all SMR specs, see [netbeheer](https://www.netbeheernederland.nl/dossiers/sl
 For Belgium/Fluvius, open your P1 port through [Fluvius portal](https://mijn.fluvius.be/): 
 
 For encrypted P1/dsmr, there is a [fork](https://github.com/wehrmannit/dsmr2mqtt) available.
+
+## Environment Variables
+
+The Docker container can be configured using the following environment variables:
+
+### MQTT Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MQTT_BROKER` | `192.168.1.1` | MQTT broker IP address or hostname |
+| `MQTT_PORT` | `1883` | MQTT broker port |
+| `MQTT_CLIENT_ID` | `mqtt-dsmr` | Unique MQTT client identifier |
+| `MQTT_QOS` | `1` | MQTT Quality of Service (0, 1, or 2) |
+| `MQTT_USERNAME` | (empty) | MQTT authentication username |
+| `MQTT_PASSWORD` | (empty) | MQTT authentication password |
+| `MQTT_MAXRATE` | `60` | Max MQTT messages per hour (1-3600). Examples: 1=hourly, 12=every 5min, 60=every 1min, 720=every 5sec |
+| `MQTT_TOPIC_PREFIX` | `dsmr` | MQTT topic prefix for all messages |
+
+### Home Assistant Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `HA_DISCOVERY` | `true` | Enable Home Assistant MQTT Auto Discovery |
+| `HA_DELETECONFIG` | `true` | Remove auto discovery config when program exits |
+| `HA_DISCOVERY_RATE` | `12` | Discovery messages per hour (12 = every 5 minutes) |
+
+### Serial Port Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SERIAL_PORT` | `/dev/ttyUSB0` | P1 USB serial port device path |
+| `SERIAL_BAUDRATE` | `115200` | Serial port baud rate |
+
+### Application Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DSMR_LOGLEVEL` | `INFO` | Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
+| `DSMR_PRODUCTION` | `true` | Set to `false` to use simulation file instead of serial port |
+| `DSMR_SIMULATORFILE` | `test/dsmr.raw` | Path to simulation file (used when DSMR_PRODUCTION=false) |
+
+### Docker Compose Example
+
+```yaml
+version: '3.8'
+services:
+  dsmr2mqtt:
+    image: ghcr.io/thijsmie/dsmr2mqtt:latest
+    container_name: dsmr2mqtt
+    restart: unless-stopped
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+    environment:
+      - MQTT_BROKER=192.168.1.1
+      - MQTT_PORT=1883
+      - MQTT_USERNAME=myuser
+      - MQTT_PASSWORD=mypassword
+      - MQTT_TOPIC_PREFIX=dsmr
+      - HA_DISCOVERY=true
+      - SERIAL_PORT=/dev/ttyUSB0
+      - DSMR_LOGLEVEL=INFO
+```
 
 ## Licence
 GPL v3
