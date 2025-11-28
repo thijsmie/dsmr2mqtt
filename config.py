@@ -43,11 +43,12 @@ def _parse_mqtt_url(url):
 
     Supported URL schemes:
     - mqtt://host:port - TCP connection (default port 1883)
-    - ws://host:port - WebSocket connection (default port 80)
-    - wss://host:port - WebSocket Secure connection (default port 443)
+    - mqtts://host:port - TCP with TLS connection (default port 8883)
+    - ws://host:port/path - WebSocket connection (default port 80)
+    - wss://host:port/path - WebSocket Secure connection (default port 443)
 
     Returns:
-        tuple: (host, port, transport, use_tls)
+        tuple: (host, port, transport, use_tls, path)
     """
     parsed = urlparse(url)
     scheme = parsed.scheme.lower()

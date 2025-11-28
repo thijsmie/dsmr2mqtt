@@ -166,7 +166,7 @@ class MQTTClient(threading.Thread):
 
     # Configure TLS if enabled
     if self.__use_tls:
-      self.__mqtt.tls_set(cert_reqs=ssl.CERT_REQUIRED, tls_version=ssl.PROTOCOL_TLS)
+      self.__mqtt.tls_set(cert_reqs=ssl.CERT_REQUIRED)
       logger.info("TLS enabled for MQTT connection")
 
     # Configure WebSocket path if using websockets transport
