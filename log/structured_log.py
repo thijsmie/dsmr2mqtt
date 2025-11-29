@@ -250,12 +250,11 @@ def get_stats_logger() -> StatisticsLogger:
         if _logger is None:
             _logger = setup_logging()
 
-        # Get interval from config if available, otherwise use default
+        # Get interval from environment variable directly to avoid circular import with config
+        interval_str = os.environ.get("DSMR_STATS_LOG_INTERVAL", "300")
         try:
-            from config import STATS_LOG_INTERVAL
-
-            interval = STATS_LOG_INTERVAL
-        except ImportError:
+            interval = int(interval_str)
+        except ValueError:
             interval = 300
 
         _stats_logger = StatisticsLogger(_logger, interval)
