@@ -25,14 +25,7 @@ import re
 import config as cfg
 import dsmr50 as dsmr
 
-# Logging
-import __main__
-import logging
-import os
-
-script = os.path.basename(__main__.__file__)
-script = os.path.splitext(script)[0]
-logger = logging.getLogger(script + "." + __name__)
+from log import logger
 
 
 class Discovery(threading.Thread):
@@ -47,7 +40,7 @@ class Discovery(threading.Thread):
     :param str                  version: version of the program
     """
 
-    logger.debug(f'LOGGER: init class Discovery >>')
+    logger.debug("discovery_init_started")
     super().__init__()
     self.__stopper = stopper
     self.__mqtt = mqtt
@@ -57,7 +50,7 @@ class Discovery(threading.Thread):
     self.__listofjsondicts = list()
 
   def __del__(self):
-    logger.debug(">>")
+    logger.debug("discovery_destroyed")
 
   def __create_discovery_JSON(self):
     """
@@ -69,7 +62,7 @@ class Discovery(threading.Thread):
     d = {}  # d = dict() does not work....
 
     # create device JSON
-    logger.debug(f'LOGGER: create device JSON')
+    logger.debug("creating_device_json")
     d["name"] = "status"
     d["unique_id"] = "dsmr-device" + cfg.HA_ID
     d["state_topic"] = cfg.MQTT_TOPIC_PREFIX + "/status"
@@ -84,7 +77,7 @@ class Discovery(threading.Thread):
     self.__listofjsondicts.append(d)
 
     # iterate through all dsmr.defintions
-    logger.debug(f'LOGGER: iterate through all dsmr.defintions')
+    logger.debug("iterating_dsmr_definitions")
     for index in dsmr.definition:
       # select definitions with discovery enabled
       if int(dsmr.definition[index][dsmr.HA_INCLUDED]):
@@ -137,20 +130,18 @@ class Discovery(threading.Thread):
               # Homeassistant expects m3 and not liters
               d["value_template"] = "{{value_json." + tag_matches[i] + "|float/1000|round(0)" + "}}"
             else:
-              logger.debug(f"Unknown unit_of_measurement = {d['unit_of_measurement']}")
+              logger.debug("unknown_unit_of_measurement", unit=d['unit_of_measurement'])
 
             i += 1
 
             d["icon"] = dsmr.definition[index][dsmr.HA_ICON]
             d["device"] = {"identifiers": ["dsmr" + cfg.HA_ID]}
 
-            # logger.debug(f'LOGGER: %s', d)
-            logger.debug(
-              f'LOGGER: sensor config created with unique_id = {d["unique_id"]} and description = {d["name"]}')
+            logger.debug("sensor_config_created", unique_id=d["unique_id"], name=d["name"])
 
             self.__listofjsondicts.append(d)
         else:
-          logger.warning(f'WARNING: entries in the DSMR50.py file do not contain equal amounts for tag = {tag}, regex = {regex} and description = {description}')
+          logger.warning("dsmr_definition_mismatch", tag=tag, regex=regex, description=description)
 
   def run(self):
     """
@@ -158,13 +149,13 @@ class Discovery(threading.Thread):
     Returns:
       None
     """
-    logger.debug(">>")
+    logger.debug("discovery_thread_started")
 
     self.__create_discovery_JSON()
 
     # infinite loop
     if cfg.HA_DISCOVERY:
-      logger.info(f'Home Assistant config discovery is enabled')
+      logger.info("ha_discovery_enabled")
       while not self.__stopper.is_set():
         # calculate time elapsed since last MQTT
         t_elapsed = int(time.time()) - self.__lastmqtt
@@ -178,7 +169,7 @@ class Discovery(threading.Thread):
           # wait...
           time.sleep(0.5)
     else:
-      logger.info(f'Home Assistant config discovery is DISABLED')
+      logger.info("ha_discovery_disabled")
 
     # If configured, remove MQTT Auto Discovery configuration
     if cfg.HA_DELETECONFIG:

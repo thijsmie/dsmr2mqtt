@@ -53,13 +53,7 @@ import paho.mqtt.client as mqtt_client
 import paho.mqtt as paho_mqtt
 from packaging.version import Version
 
-# Logging
-import __main__
-import logging
-import os
-script = os.path.basename(__main__.__file__)
-script = os.path.splitext(script)[0]
-logger = logging.getLogger(script + "." + __name__)
+from log import logger, stats_logger
 
 # TODO
 # MQTT_ERR_NOMEM is not very accurate; is often similar to MQTT_ERR_CONN_LOST
@@ -107,7 +101,7 @@ class MQTTClient(threading.Thread):
       None
     """
 
-    logger.info(f">> paho-mqtt version = {paho_mqtt.__version__}")
+    logger.info("mqtt_client_init", paho_version=paho_mqtt.__version__)
     super().__init__()
 
     self.__mqtt_broker = mqtt_broker
@@ -120,12 +114,11 @@ class MQTTClient(threading.Thread):
     # Generate random client id if not specified;
     # Basename ('script', from log module) and extended with 10 random characters
     if mqtt_client_id is None:
-      self.__mqtt_client_id = script + '_' + ''.join(random.choice(string.ascii_lowercase) for _i in range(10))
+      self.__mqtt_client_id = 'dsmr_' + ''.join(random.choice(string.ascii_lowercase) for _i in range(10))
     else:
       self.__mqtt_client_id = mqtt_client_id
 
-    logger.info(f"MQTT Client ID = {self.__mqtt_client_id}")
-    logger.info(f"MQTT Transport = {self.__transport}, TLS = {self.__use_tls}")
+    logger.info("mqtt_client_configured", client_id=self.__mqtt_client_id, transport=self.__transport, tls=self.__use_tls)
 
     self.__qos = mqtt_qos
     self.__mqtt_cleansession = mqtt_cleansession
@@ -140,8 +133,7 @@ class MQTTClient(threading.Thread):
     # Demote to v311 if wrong version is installed
     if self.__mqtt_protocol == mqtt_client.MQTTv5:
       if Version(f"{paho_mqtt.__version__}") < Version("1.5.1"):
-        logger.warning(f"Incorrect paho-mqtt version ({paho_mqtt.__version__}) to support MQTT v5, "
-                       f"reverting to MQTT v311")
+        logger.warning("mqtt_version_downgrade", paho_version=paho_mqtt.__version__, from_version="MQTTv5", to_version="MQTTv311")
         self.__mqtt_protocol = mqtt_client.MQTTv311
 
     # clean_session is only implemented for MQTT v3
@@ -159,7 +151,7 @@ class MQTTClient(threading.Thread):
           protocol=self.__mqtt_protocol,
           transport=self.__transport)
     else:
-      logger.error(f"Unknown MQTT protocol version {mqtt_protocol}....exit")
+      logger.error("unknown_mqtt_protocol", protocol=mqtt_protocol)
       self.__worker_threads_stopper.set()
       self.__mqtt_stopper.set()
       return
@@ -167,12 +159,12 @@ class MQTTClient(threading.Thread):
     # Configure TLS if enabled
     if self.__use_tls:
       self.__mqtt.tls_set(cert_reqs=ssl.CERT_REQUIRED)
-      logger.info("TLS enabled for MQTT connection")
+      logger.info("mqtt_tls_enabled")
 
     # Configure WebSocket path if using websockets transport
     if self.__transport == "websockets" and self.__ws_path:
       self.__mqtt.ws_set_options(path=self.__ws_path)
-      logger.info(f"WebSocket path set to: {self.__ws_path}")
+      logger.info("mqtt_websocket_configured", path=self.__ws_path)
 
     # Indicate whether thread has started - run() has been called
     self.__run = False
@@ -235,8 +227,8 @@ class MQTTClient(threading.Thread):
     self.__list_of_subscribed_topics = []
 
   def __del__(self):
-    logger.debug(f">>")
-    logger.info(f"Shutting down MQTT Client... {self.__mqtt_counter} MQTT messages have been published")
+    logger.debug("mqtt_client_destroyed")
+    logger.info("mqtt_client_shutdown", messages_published=self.__mqtt_counter)
 
   def __internet_on(self):
     """
@@ -246,27 +238,26 @@ class MQTTClient(threading.Thread):
       return: connectivity status (True, False)
       rtype: bool
     """
-    logger.debug(f">>")
+    logger.debug("checking_broker_connectivity")
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
       # Format: s.connect((HOST, PORT))
       s.connect((f"{self.__mqtt_broker}", int(self.__mqtt_port)))
       s.shutdown(socket.SHUT_RDWR)
-      logger.debug(f"Internet connectivity to MQTT broker {self.__mqtt_broker} at port {self.__mqtt_port} available")
+      logger.debug("broker_connectivity_available", broker=self.__mqtt_broker, port=self.__mqtt_port)
       return True
     except Exception as e:
-      logger.info(f"Internet connectivity to MQTT broker {self.__mqtt_broker} at port {self.__mqtt_port} "
-                  f"NOT yet available; Exception {e}")
+      logger.info("broker_connectivity_unavailable", broker=self.__mqtt_broker, port=self.__mqtt_port, error=str(e))
       return False
 
   def __set_connected_flag(self, flag=True):
-    logger.debug(f">> flag={flag}; current __connected_flag={self.__connected_flag}")
+    logger.debug("set_connected_flag", new_flag=flag, current_flag=self.__connected_flag)
 
     # if flag == False and __connected_flag == True; start trigger
     if not flag and self.__connected_flag:
       self.__disconnect_start_time = int(time.time())
-      logger.debug("Disconnect TIMER started")
+      logger.debug("disconnect_timer_started")
 
     self.__connected_flag = flag
     return
@@ -286,18 +277,19 @@ class MQTTClient(threading.Thread):
     Returns:
       None
     """
-    logger.debug(f">>")
+    logger.debug("on_connect_callback")
     if reason_code.is_failure:
-      logger.error(f"userdata={userdata}; flags={connect_flags}; reason_code={reason_code}")
+      logger.error("mqtt_connection_failed", reason_code=str(reason_code))
+      stats_logger.increment("mqtt_errors")
       self.__set_connected_flag(False)
     else:
-      logger.debug(f"Connected: userdata={userdata}; flags={connect_flags}; reason_code={reason_code}")
+      logger.debug("mqtt_connected", reason_code=str(reason_code))
       self.__set_connected_flag(True)
       self.__set_status()
 
       # Re-subscribe, in case connection was lost
       for topic in self.__list_of_subscribed_topics:
-        logger.debug(f"Resubscribe topic: {topic}")
+        logger.debug("resubscribing_topic", topic=topic)
         self.__mqtt.subscribe(topic, self.__qos)
 
   def __on_disconnect(self, _client, userdata, disconnect_flags, reason_code, _properties=None):
@@ -316,9 +308,10 @@ class MQTTClient(threading.Thread):
       None
     """
     if reason_code.is_failure:
-      logger.warning(f"Unexpected disconnect, userdata = {userdata}; reason_code = {reason_code}")
+      logger.warning("mqtt_unexpected_disconnect", reason_code=str(reason_code))
+      stats_logger.increment("mqtt_errors")
     else:
-      logger.info(f"Expected disconnect, userdata = {userdata}; reason_code = {reason_code}")
+      logger.info("mqtt_expected_disconnect", reason_code=str(reason_code))
 
     self.__set_connected_flag(False)
     return
@@ -330,7 +323,7 @@ class MQTTClient(threading.Thread):
     :param message: Queue()
     :return:
     """
-    logger.debug(f">> message = {message.topic}  {message.payload}")
+    logger.debug("message_received", topic=message.topic)
 
     self.__subscribed_queue.put(message)
 
@@ -352,7 +345,7 @@ class MQTTClient(threading.Thread):
     Returns:
       None
     """
-    logger.debug(f"userdata={userdata}; mid={mid}; reason_code={reason_code}")
+    logger.debug("on_publish_callback", mid=mid, reason_code=str(reason_code))
     return None
 
   def __on_subscribe_v5(self, _client, _userdata, mid, reason_codes, _properties=None):
@@ -366,10 +359,10 @@ class MQTTClient(threading.Thread):
                       list of Properties class instances.
     :return:
     """
-    logger.debug(f"Subscribed mid variable: {mid}")
+    logger.debug("subscribed_v5", mid=mid)
 
     for rc in reason_codes:
-      logger.debug(f"reasonCode = {rc}")
+      logger.debug("subscription_reason_code", reason_code=str(rc))
 
   def __on_subscribe_v31(self, _client, _userdata, mid, reason_codes, _properties=None):
     """
@@ -381,10 +374,10 @@ class MQTTClient(threading.Thread):
     :param _properties: The MQTT v5.0 properties received from the broker.
     :return:
     """
-    logger.debug(f"Subscribed mid variable: {mid}")
+    logger.debug("subscribed_v31", mid=mid)
 
     for rc in reason_codes:
-      logger.debug(f"Granted QoS = {rc}")
+      logger.debug("granted_qos", qos=str(rc))
 
   def __on_unsubscribe(self, _client, _userdata, mid, reason_codes, _properties=None):
     """
@@ -396,7 +389,7 @@ class MQTTClient(threading.Thread):
            list of Properties class instances.
     :return:
     """
-    logger.debug(f">> Unsubscribed: {mid}")
+    logger.debug("unsubscribed", mid=mid)
 
   def __on_log(self, client, _userdata, level, buf):
     """
@@ -411,14 +404,14 @@ class MQTTClient(threading.Thread):
     Returns:
       None
     """
-    logger.debug(f"obj={client}; level={level}; buf={buf}")
+    logger.debug("mqtt_log", level=level, message=buf)
 
   def __set_status(self):
     """
     Publish MQTT status message
     :return: None
     """
-    logger.debug(">>")
+    logger.debug("set_status_called")
 
     if self.__status_topic is not None:
       self.do_publish(self.__status_topic, self.__status_payload, self.__status_retain)
@@ -435,7 +428,7 @@ class MQTTClient(threading.Thread):
     :param bool retain:
     :return: None
     """
-    logger.debug(">>")
+    logger.debug("set_status", topic=topic, payload=payload)
     self.__status_topic = topic
     self.__status_payload = payload
     self.__status_retain = retain
@@ -452,10 +445,10 @@ class MQTTClient(threading.Thread):
     :param bool retain:
     :return: None
     """
-    logger.debug(f">>")
+    logger.debug("will_set", topic=topic)
 
     if self.__run:
-      logger.warning(f"Last Will/testament is set after run() is called. Not advised per documentation")
+      logger.warning("will_set_after_run", message="Last Will/testament is set after run() is called")
 
     self.__mqtt.will_set(topic, payload, qos, retain)
 
@@ -471,17 +464,19 @@ class MQTTClient(threading.Thread):
     Returns:
       None
     """
-    logger.debug(f">> TOPIC={topic}; MESSAGE={message}")
+    logger.debug("do_publish", topic=topic)
 
     try:
       mqttmessageinfo = self.__mqtt.publish(topic=topic, payload=message, qos=self.__qos, retain=retain)
       self.__mqtt_counter += 1
+      stats_logger.increment("mqtt_messages_sent")
 
       if mqttmessageinfo.rc != mqtt_client.MQTT_ERR_SUCCESS:
-        logger.warning(f"MQTT publish was not successfull, rc = {mqttmessageinfo.rc}: "
-                       f"{mqtt_client.error_string(mqttmessageinfo.rc)}")
-    except ValueError:
-      logger.warning("")
+        logger.warning("mqtt_publish_failed", rc=mqttmessageinfo.rc, error=mqtt_client.error_string(mqttmessageinfo.rc))
+        stats_logger.increment("mqtt_errors")
+    except ValueError as e:
+      logger.warning("mqtt_publish_error", error=str(e))
+      stats_logger.increment("mqtt_errors")
 
   def set_message_trigger(self, subscribed_queue, trigger=None):
     """
@@ -499,19 +494,19 @@ class MQTTClient(threading.Thread):
 
     # Re-subscribe, in case connection was lost
     for topic in self.__list_of_subscribed_topics:
-      logger.debug(f"Resubscribe topic: {topic}")
+      logger.debug("resubscribing_topic", topic=topic)
       self.__mqtt.subscribe(topic, self.__qos)
 
     return
 
   def subscribe(self, topic):
-    logger.debug(f">> topic = {topic}")
+    logger.debug("subscribing", topic=topic)
 
     # Add to subscribed topic to queue (for resubscribing when reconnecting)
     self.__list_of_subscribed_topics.append(topic)
 
     if self.__subscribed_queue is None:
-      logger.error(f"Subscription message queue has not been set --> call set_message_trigger")
+      logger.error("subscription_queue_not_set", message="call set_message_trigger first")
       return
 
     # Subscribing will not work if client is not connected
@@ -533,18 +528,17 @@ class MQTTClient(threading.Thread):
     :param topic:
     :return:
     """
-    logger.debug(f">> topic = {topic}")
+    logger.debug("unsubscribing", topic=topic)
     self.__mqtt.unsubscribe(topic)
 
     try:
       self.__list_of_subscribed_topics.remove(topic)
     except ValueError:
-      logger.warning(f"MQTT client was not subscribed to topic '{topic}'; "
-                     f"did you use exact same topic as when subscribing?")
+      logger.warning("unsubscribe_topic_not_found", topic=topic)
     return
 
   def run(self):
-    logger.info(f"Broker = {self.__mqtt_broker}>>")
+    logger.info("mqtt_thread_starting", broker=self.__mqtt_broker)
     self.__run = True
 
     # Wait till there is network connectivity to mqtt broker
@@ -556,7 +550,7 @@ class MQTTClient(threading.Thread):
 
       # Timeout after 60min
       if delay > 3600:
-        logger.error(f"No internet connection - EXIT")
+        logger.error("mqtt_connection_timeout")
         self.__mqtt_stopper.set()
         self.__worker_threads_stopper.set()
         return
@@ -590,19 +584,19 @@ class MQTTClient(threading.Thread):
                                     clean_start=False,
                                     properties=None)
       else:
-        logger.error(f"Unknown MQTT protocol version {self.__mqtt_protocol}....exit")
+        logger.error("unknown_mqtt_protocol", protocol=self.__mqtt_protocol)
         self.__worker_threads_stopper.set()
         self.__mqtt_stopper.set()
 
     except Exception as e:
-      logger.exception(f"Exception {format(e)}")
+      logger.exception("mqtt_connect_exception", error=str(e))
       self.__mqtt.disconnect()
       self.__mqtt_stopper.set()
       self.__worker_threads_stopper.set()
       return
 
     else:
-      logger.info(f"Start mqtt loop...")
+      logger.info("mqtt_loop_started")
       self.__mqtt.loop_start()
 
     # Start infinite loop which sends queued messages every second
@@ -614,12 +608,12 @@ class MQTTClient(threading.Thread):
       # then reconnect
       if not self.__connected_flag:
         disconnect_time = int(time.time()) - self.__disconnect_start_time
-        logger.debug(f"Disconnect TIMER = {disconnect_time}")
+        logger.debug("disconnect_timer", elapsed_seconds=disconnect_time)
         if disconnect_time > self.__MQTT_CONNECTION_TIMEOUT:
           try:
             self.__mqtt.reconnect()
           except Exception as e:
-            logger.exception(f"Exception {format(e)}")
+            logger.exception("mqtt_reconnect_exception", error=str(e))
 
             # reconnect failed....reset disconnect time, and retry after self.__MQTT_CONNECTION_TIMEOUT
             self.__disconnect_start_time = int(time.time())
@@ -627,12 +621,10 @@ class MQTTClient(threading.Thread):
       time.sleep(0.1)
 
     # Close mqtt broker
-    logger.debug(f"Close down MQTT client & connection to broker")
+    logger.debug("mqtt_client_closing")
     self.__mqtt.loop_stop()
     self.__mqtt.disconnect()
     self.__mqtt_stopper.set()
     self.__worker_threads_stopper.set()
 
-    logger.info(f"Shutting down MQTT Client... {self.__mqtt_counter} MQTT messages have been published")
-
-    logger.info(f"<<")
+    logger.info("mqtt_client_stopped", messages_published=self.__mqtt_counter)

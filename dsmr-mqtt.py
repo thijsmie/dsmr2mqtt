@@ -46,8 +46,7 @@ import P1_parser as convert
 import hadiscovery as ha
 import mqtt as mqtt
 
-from log import logger
-logger.setLevel(cfg.loglevel)
+from log import logger, stats_logger
 
 # DEFAULT exit code
 # status=1/FAILURE
@@ -67,9 +66,9 @@ if sys.platform == "linux":
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     # Create an abstract socket, by prefixing it with null.
     s.bind(lockfile)
-    logger.info( f"Starting {__file__}; version = {__version__}" )
+    logger.info("application_started", file=__file__, version=__version__)
   except IOError as err:
-    logger.info( f"{lockfile} already running. Exiting; {err}" )
+    logger.error("instance_already_running", lockfile=lockfile, error=str(err))
     sys.exit(1)
 
 
@@ -80,8 +79,9 @@ def close():
   Returns:
     None
   """
-
-  logger.info(f"Exitcode = {__exit_code} >>")
+  # Stop statistics logging
+  stats_logger.stop()
+  logger.info("application_exiting", exit_code=__exit_code)
   sys.exit(__exit_code)
 
 
@@ -128,20 +128,27 @@ def exit_gracefully(signal, stackframe):
     :return:
   """
 
-  logger.debug(f"Signal {signal}: >>")
+  logger.debug("signal_received", signal=signal)
 
   # status=0/SUCCESS
   __exit_code = 0
 
   t_threads_stopper.set()
-  logger.info("<<")
+  logger.info("graceful_shutdown_initiated")
 
 
 def main():
-  logger.debug(">>")
+  logger.debug("main_started")
 
-  logger.info(f"P1 serial port = {cfg.ser_port}")
-  logger.info(f"MQTT Max Rate = {cfg.MQTT_MAXRATE}")
+  # Start statistics logging
+  stats_logger.start()
+
+  logger.info(
+    "configuration_loaded",
+    serial_port=cfg.ser_port,
+    mqtt_maxrate=cfg.MQTT_MAXRATE,
+    stats_interval=cfg.STATS_LOG_INTERVAL,
+  )
 
   # Set last will/testament
   t_mqtt.will_set(cfg.MQTT_TOPIC_PREFIX + "/status", payload="offline", qos=cfg.MQTT_QOS, retain=True)
@@ -156,24 +163,24 @@ def main():
 
   # Set status to online
   t_mqtt.set_status(cfg.MQTT_TOPIC_PREFIX + "/status", "online", retain=True)
-  logger.debug(f'Meter status set to online')
+  logger.debug("meter_status_updated", status="online")
   t_mqtt.do_publish(cfg.MQTT_TOPIC_PREFIX + "/sw-version", f"main={__version__}; mqtt={mqtt.__version__}", retain=True)
 
   # block till t_serial stops receiving telegrams/exits
   t_serial.join()
-  logger.debug("t_serial.join exited; set stopper for other threats")
+  logger.debug("serial_thread_exited")
   t_threads_stopper.set()
 
   # Set status to offline
   t_mqtt.set_status(cfg.MQTT_TOPIC_PREFIX + "/status", "offline", retain=True)
-  logger.debug(f'Meter status set to offline')
+  logger.debug("meter_status_updated", status="offline")
 
   # Todo check if MQTT queue is empty before setting stopper
   # Use a simple delay of 1sec before closing mqtt
   time.sleep(1)
   t_mqtt_stopper.set()
 
-  logger.debug("<<" )
+  logger.debug("main_completed")
   return
 
 
@@ -181,12 +188,12 @@ def main():
 # Entry point
 # ------------------------------------------------------------------------------------
 if __name__ == '__main__':
-  logger.debug("__main__: >>")
+  logger.debug("entrypoint_started")
   signal.signal(signal.SIGINT, exit_gracefully)
   signal.signal(signal.SIGTERM, exit_gracefully)
 
   # start main program
   main()
 
-  logger.debug("__main__: <<")
+  logger.debug("entrypoint_completed")
   close()
