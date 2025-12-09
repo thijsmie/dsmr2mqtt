@@ -112,19 +112,19 @@ class Discovery(threading.Thread):
             # https://www.home-assistant.io/integrations/sensor/
             # https://developers.home-assistant.io/docs/core/entity/sensor/#long-term-statistics
             if d["unit_of_measurement"] == "Wh":
-              d["device_class"] = "ENERGY"
+              d["device_class"] = "energy"
               d["state_class"] = "total"
             elif d["unit_of_measurement"] == "W":
-              d["device_class"] = "POWER"
+              d["device_class"] = "power"
 #              d["state_class"] = "measurement"
             elif d["unit_of_measurement"] == "A":
-              d["device_class"] = "CURRENT"
+              d["device_class"] = "current"
 #              d["state_class"] = "measurement"
             elif d["unit_of_measurement"] == "V":
-              d["device_class"] = "VOLTAGE"
+              d["device_class"] = "voltage"
 #              d["state_class"] = "measurement"
             elif d["unit_of_measurement"] == "m3" or d["unit_of_measurement"] == "m\u00b3":
-              d["device_class"] = "GAS"
+              d["device_class"] = "gas"
               d["state_class"] = "total"
 
               # Homeassistant expects m3 and not liters
