@@ -14,7 +14,7 @@ Usage:
     stats_logger.increment("mqtt_messages_sent")
 """
 
-from .structured_log import get_logger, get_stats_logger, StatisticsLogger
+from .structured_log import StatisticsLogger, get_logger, get_stats_logger
 
 # Initialize the main logger
 logger = get_logger("dsmr2mqtt")

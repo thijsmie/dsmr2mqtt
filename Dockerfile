@@ -11,13 +11,11 @@ WORKDIR /app
 
 # Copy project files
 COPY pyproject.toml uv.lock ./
-COPY *.py ./
-COPY log/ ./log/
-COPY mqtt/ ./mqtt/
+COPY src/ ./src/
 COPY test/ ./test/
 
 # Install dependencies using uv (frozen to ensure reproducibility)
-RUN uv sync --frozen --no-dev --no-install-project
+RUN uv sync --frozen --no-dev
 
 # Create a non-root user for security
 RUN useradd --create-home --shell /bin/bash dsmr && \
@@ -54,4 +52,4 @@ ENV DSMR_PRODUCTION="true"
 ENV DSMR_SIMULATORFILE="test/dsmr.raw"
 
 # Run the application
-CMD ["uv", "run", "python", "dsmr-mqtt.py"]
+CMD ["uv", "run", "dsmr2mqtt"]

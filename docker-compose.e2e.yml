@@ -1,0 +1,81 @@
+services:
+  # Mosquitto MQTT broker for testing
+  mqtt:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./test/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/#", "-C", "1", "-i", "healthcheck", "-W", "3"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # Virtual USB device that emulates a DSMR meter
+  virtual-usb:
+    image: alpine:3.19
+    command: >
+      sh -c "
+        apk add --no-cache socat &&
+        socat -d -d pty,link=/dev/ttyUSB0,raw,echo=0 exec:'sh -c \"while true; do cat /data/dsmr.raw; sleep 1; done\"',pty,raw,echo=0
+      "
+    volumes:
+      - ./test:/data
+      - usb-device:/dev
+    privileged: true
+
+  # The dsmr2mqtt application
+  dsmr2mqtt:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      mqtt:
+        condition: service_healthy
+      virtual-usb:
+        condition: service_started
+    environment:
+      - MQTT_BROKER=mqtt
+      - MQTT_PORT=1883
+      - MQTT_USERNAME=
+      - MQTT_PASSWORD=
+      - MQTT_TOPIC_PREFIX=dsmr
+      - HA_DISCOVERY=true
+      - SERIAL_PORT=/dev/ttyUSB0
+      - SERIAL_BAUDRATE=115200
+      - DSMR_LOGLEVEL=INFO
+      - DSMR_PRODUCTION=true
+      - DSMR_LOG_FORMAT=JSON
+    volumes:
+      - usb-device:/dev
+    privileged: true
+
+  # Test container that validates the e2e functionality
+  test:
+    image: eclipse-mosquitto:2
+    depends_on:
+      mqtt:
+        condition: service_healthy
+      dsmr2mqtt:
+        condition: service_started
+    command: >
+      sh -c "
+        apk add --no-cache jq &&
+        echo 'Waiting for MQTT messages...' &&
+        sleep 15 &&
+        echo 'Subscribing to DSMR topic...' &&
+        timeout 30 mosquitto_sub -h mqtt -t 'dsmr/#' -C 1 -v > /tmp/mqtt_output.txt &&
+        echo 'Received MQTT message:' &&
+        cat /tmp/mqtt_output.txt &&
+        if grep -q 'dsmr/' /tmp/mqtt_output.txt; then
+          echo 'SUCCESS: MQTT messages received from dsmr2mqtt';
+          exit 0;
+        else
+          echo 'FAILED: No MQTT messages received';
+          exit 1;
+        fi
+      "
+
+volumes:
+  usb-device:

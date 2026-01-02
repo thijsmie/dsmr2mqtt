@@ -33,11 +33,10 @@ Usage:
 """
 
 import logging
-import sys
 import os
-import time
+import sys
 import threading
-from typing import Any
+import time
 
 import structlog
 from structlog.typing import Processor
@@ -95,7 +94,8 @@ def setup_logging() -> structlog.stdlib.BoundLogger:
 
     # Configure structlog
     structlog.configure(
-        processors=shared_processors + [
+        processors=shared_processors
+        + [
             structlog.processors.format_exc_info,
             structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
         ],

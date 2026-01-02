@@ -4,7 +4,7 @@ version = "4.0.2"
 description = "MQTT client for Belgian and Dutch Smart Meter (DSMR) - Slimme Meter"
 readme = "README.md"
 license = "GPL-3.0-or-later"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 authors = [
     { name = "Hans IJntema" }
 ]
@@ -33,4 +33,51 @@ Homepage = "https://github.com/thijsmie/dsmr2mqtt"
 Repository = "https://github.com/thijsmie/dsmr2mqtt"
 
 [dependency-groups]
-dev = []
+dev = [
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatchling.build.targets.wheel]
+packages = ["src/dsmr2mqtt"]
+
+[project.scripts]
+dsmr2mqtt = "dsmr2mqtt.__main__:main"
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["dsmr2mqtt"]
+
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+strict_equality = true
