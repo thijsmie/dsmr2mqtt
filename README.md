@@ -8,7 +8,7 @@ Parsed telegrams are send to MQTT broker.
 
 Includes Home Assistant MQTT Auto Discovery.
 
-In `dsmr50.py`, specify:
+In `src/dsmr2mqtt/dsmr50.py`, specify:
 * Which messages to be parsed
 * MQTT topics and tags
 * Auto discovery for Home Assistant
@@ -32,7 +32,7 @@ A typical MQTT message broadcast looks like:
 A virtual DSMR parameter is implemented (el_consumed and el_returned, which is sum of tarif1 and tarif2 (night/low en day/normal tariff)) - as some have a dual tarif meter, while energy company administratively considers this as a mono tarif meter.
 
 ## Requirements
-This project requires Python 3.13 or later.
+This project requires Python 3.12 or later.
 
 ### Using uv (recommended)
 Install [uv](https://docs.astral.sh/uv/) and run:
@@ -41,11 +41,10 @@ uv sync
 ```
 
 ### Using pip
-Install the following python3 libraries:
-* paho-mqtt
-* pyserial
-* persist-queue
-* packaging
+Install the package with pip:
+```bash
+pip install -e .
+```
 
 ### Using Docker
 Pull the image from GitHub Container Registry:
@@ -62,6 +61,54 @@ docker run -d \
   -e MQTT_USERNAME=myuser \
   -e MQTT_PASSWORD=mypassword \
   ghcr.io/thijsmie/dsmr2mqtt:latest
+```
+
+## Development
+
+This project uses modern Python development tools for code quality:
+
+### Using Just (recommended)
+Install [just](https://github.com/casey/just) and use the provided justfile:
+
+```bash
+# Install all dependencies including dev tools
+just install-dev
+
+# Format code
+just format
+
+# Run linter
+just lint
+
+# Run type checker
+just typecheck
+
+# Run all checks
+just check
+
+# Fix all auto-fixable issues
+just fix
+
+# Run the application in simulation mode
+just run-sim
+
+# Run end-to-end tests
+just e2e-test
+```
+
+### Manual commands
+```bash
+# Install dev dependencies
+pip install ruff mypy
+
+# Format code
+ruff format src/
+
+# Lint code
+ruff check src/
+
+# Type check
+mypy src/dsmr2mqtt
 ```
 
 ## Test the P1 adapter & USB connection:
@@ -96,11 +143,8 @@ cd dsmr2mqtt/
 # Install dependencies with uv
 uv sync
 
-# Option A: Use environment variables (recommended)
-MQTT_BROKER=192.168.1.1 MQTT_USERNAME=myuser MQTT_PASSWORD=mypassword uv run python dsmr-mqtt.py
-
-# Option B: Edit config.py directly with your MQTT settings
-# uv run python dsmr-mqtt.py
+# Run the application
+MQTT_BROKER=192.168.1.1 MQTT_USERNAME=myuser MQTT_PASSWORD=mypassword uv run dsmr2mqtt
 ```
 
 ### Option 2: Using Docker with Environment Variables
@@ -118,15 +162,16 @@ docker run -d \
 See the [Environment Variables](#environment-variables) section for all available options.
 
 ### Option 3: Traditional Installation
-* Install Python 3.13+ and packages per recommendation for your distro
+* Install Python 3.12+ and packages per recommendation for your distro
 * Install from github and configure:
   * mkdir & cd to your install location 
   * git clone https://github.com/thijsmie/dsmr2mqtt.git
-  * cd dsmr2mqtt/ 
+  * cd dsmr2mqtt/
+  * pip install -e .
 * In `systemd/dsmr-mqtt.service`:
-  * Adapt ExecStart under [Service] to ExecStart=/<your location>/dsmr-mqtt.py (default: `/opt/iot/dsmr`)
+  * Adapt ExecStart under [Service] to ExecStart=dsmr2mqtt
 * sudo cp -p systemd/dsmr-mqtt.service /etc/systemd/system
-* Set environment variables in `systemd/dsmr-mqtt.service` or edit `config.py` directly for your configuration (minimal: MQTT broker, username, password)
+* Set environment variables in `systemd/dsmr-mqtt.service` for your configuration (minimal: MQTT broker, username, password)
   * The MQTT_TOPIC_PREFIX (default: "dsmr") determines the topic prefix. Messages appear as `dsmr/...` and Home Assistant config as `homeassistant/sensor/dsmr/...`
 
 * `sudo systemctl enable dsmr-mqtt`

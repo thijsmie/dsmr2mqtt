@@ -4,18 +4,15 @@ LABEL org.opencontainers.image.source="https://github.com/thijsmie/dsmr2mqtt"
 LABEL org.opencontainers.image.description="MQTT client for Belgian and Dutch Smart Meter (DSMR)"
 LABEL org.opencontainers.image.licenses="GPL-3.0-or-later"
 
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
-
 WORKDIR /app
 
 # Copy project files
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml ./
 COPY src/ ./src/
 COPY test/ ./test/
 
-# Install dependencies using uv (frozen to ensure reproducibility)
-RUN uv sync --frozen --no-dev
+# Install the package and dependencies using pip
+RUN pip install --no-cache-dir -e .
 
 # Create a non-root user for security
 RUN useradd --create-home --shell /bin/bash dsmr && \
@@ -52,4 +49,4 @@ ENV DSMR_PRODUCTION="true"
 ENV DSMR_SIMULATORFILE="test/dsmr.raw"
 
 # Run the application
-CMD ["uv", "run", "dsmr2mqtt"]
+CMD ["dsmr2mqtt"]
