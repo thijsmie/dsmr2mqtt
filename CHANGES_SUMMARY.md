@@ -88,17 +88,13 @@ Created `docker-compose.e2e.yml` with:
    - Configured for anonymous access
    - Healthcheck to ensure it's ready
 
-2. **Virtual USB Device**
-   - Uses socat to create virtual serial port
-   - Continuously streams test data from `test/dsmr.raw`
-   - Emulates a real DSMR meter
-
-3. **dsmr2mqtt Application**
-   - Reads from virtual USB device
+2. **dsmr2mqtt Application**
+   - Runs in simulation mode (DSMR_PRODUCTION=false)
+   - Uses test data from `test/dsmr.raw`
    - Publishes to MQTT broker
-   - Same configuration as production
+   - No physical USB device required
 
-4. **Test Container**
+3. **Test Container**
    - Subscribes to MQTT topics
    - Validates that messages are published
    - Exits with success/failure code
