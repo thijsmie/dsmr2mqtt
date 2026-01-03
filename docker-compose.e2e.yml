@@ -42,11 +42,15 @@ services:
         condition: service_started
     command: >
       sh -c "
-        apk add --no-cache jq &&
-        echo 'Waiting for MQTT messages...' &&
+        echo 'Installing dependencies...' &&
+        apk add --no-cache jq curl &&
+        echo 'Waiting for MQTT broker to be ready...' &&
+        sleep 5 &&
+        echo 'Checking if dsmr2mqtt container is running...' &&
+        echo 'Waiting for MQTT messages (sleeping 15 seconds)...' &&
         sleep 15 &&
         echo 'Subscribing to DSMR topic...' &&
-        timeout 30 mosquitto_sub -h mqtt -t 'dsmr/#' -C 1 -v > /tmp/mqtt_output.txt &&
+        timeout 30 mosquitto_sub -h mqtt -t 'dsmr/#' -C 1 -v > /tmp/mqtt_output.txt 2>&1 &&
         echo 'Received MQTT message:' &&
         cat /tmp/mqtt_output.txt &&
         if grep -q 'dsmr/' /tmp/mqtt_output.txt; then
@@ -54,6 +58,8 @@ services:
           exit 0;
         else
           echo 'FAILED: No MQTT messages received';
+          echo 'Content of output file:';
+          cat /tmp/mqtt_output.txt;
           exit 1;
         fi
       "
