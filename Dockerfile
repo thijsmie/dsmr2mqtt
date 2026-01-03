@@ -6,19 +6,26 @@ LABEL org.opencontainers.image.licenses="GPL-3.0-or-later"
 
 WORKDIR /app
 
-# Copy project files
-COPY pyproject.toml ./
-COPY src/ ./src/
-COPY test/ ./test/
+# Copy source files directly
+COPY src/dsmr2mqtt /app/dsmr2mqtt
+COPY test/ /app/test/
 
-# Install the package and dependencies using pip
-RUN pip install --no-cache-dir -e .
+# Install dependencies directly without using pyproject.toml build
+RUN pip install --no-cache-dir \
+    paho-mqtt>=2.0.0 \
+    pyserial>=3.5 \
+    persist-queue>=0.8.0 \
+    packaging>=23.0 \
+    structlog>=25.0.0
 
 # Create a non-root user for security
 RUN useradd --create-home --shell /bin/bash dsmr && \
     chown -R dsmr:dsmr /app
 
 USER dsmr
+
+# Add the app directory to Python path
+ENV PYTHONPATH=/app
 
 # Environment variables with defaults
 # MQTT Configuration
@@ -48,5 +55,5 @@ ENV DSMR_LOGLEVEL="INFO"
 ENV DSMR_PRODUCTION="true"
 ENV DSMR_SIMULATORFILE="test/dsmr.raw"
 
-# Run the application
-CMD ["dsmr2mqtt"]
+# Run the application using python -m
+CMD ["python", "-m", "dsmr2mqtt"]
