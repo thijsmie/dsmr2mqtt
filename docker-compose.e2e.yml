@@ -31,6 +31,7 @@ services:
       - DSMR_PRODUCTION=false
       - DSMR_SIMULATORFILE=test/dsmr.raw
       - DSMR_LOG_FORMAT=JSON
+    restart: always
 
   # Test container that validates the e2e functionality
   test:
