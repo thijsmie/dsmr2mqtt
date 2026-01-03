@@ -1,0 +1,66 @@
+services:
+  # Mosquitto MQTT broker for testing
+  mqtt:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./test/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/#", "-C", "1", "-i", "healthcheck", "-W", "3"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # The dsmr2mqtt application in simulation mode
+  dsmr2mqtt:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      mqtt:
+        condition: service_healthy
+    environment:
+      - MQTT_BROKER=mqtt
+      - MQTT_PORT=1883
+      - MQTT_USERNAME=
+      - MQTT_PASSWORD=
+      - MQTT_TOPIC_PREFIX=dsmr
+      - HA_DISCOVERY=true
+      - DSMR_LOGLEVEL=INFO
+      - DSMR_PRODUCTION=false
+      - DSMR_SIMULATORFILE=test/dsmr.raw
+      - DSMR_LOG_FORMAT=JSON
+    restart: always
+
+  # Test container that validates the e2e functionality
+  test:
+    image: eclipse-mosquitto:2
+    depends_on:
+      mqtt:
+        condition: service_healthy
+      dsmr2mqtt:
+        condition: service_started
+    command: >
+      sh -c "
+        echo 'Installing dependencies...' &&
+        apk add --no-cache jq curl &&
+        echo 'Waiting for MQTT broker to be ready...' &&
+        sleep 5 &&
+        echo 'Checking if dsmr2mqtt container is running...' &&
+        echo 'Waiting for MQTT messages (sleeping 15 seconds)...' &&
+        sleep 15 &&
+        echo 'Subscribing to DSMR topic...' &&
+        timeout 30 mosquitto_sub -h mqtt -t 'dsmr/#' -C 1 -v > /tmp/mqtt_output.txt 2>&1 &&
+        echo 'Received MQTT message:' &&
+        cat /tmp/mqtt_output.txt &&
+        if grep -q 'dsmr/' /tmp/mqtt_output.txt; then
+          echo 'SUCCESS: MQTT messages received from dsmr2mqtt';
+          exit 0;
+        else
+          echo 'FAILED: No MQTT messages received';
+          echo 'Content of output file:';
+          cat /tmp/mqtt_output.txt;
+          exit 1;
+        fi
+      "

@@ -50,17 +50,15 @@ V0.1:
 
 """
 
-
 # ------------------------------------------------------------------------------------
 # Logging
 # ------------------------------------------------------------------------------------
-import __main__
+import getpass
 import logging
-from logging.handlers import SysLogHandler
 import os
 import sys
-import getpass
 
+import __main__
 
 currentuser = getpass.getuser()
 
@@ -77,39 +75,45 @@ logger.propagate = False
 c_handler = logging.StreamHandler(sys.stdout)
 # This setLevel determines wich messages are processed by this handler (assuming it arrives from global logger)
 c_handler.setLevel(logging.DEBUG)
-c_format = logging.Formatter('%(name)s %(levelname)s: FUNCTION:%(funcName)s LINE:%(lineno)d: %(message)s')
+c_format = logging.Formatter(
+    "%(name)s %(levelname)s: FUNCTION:%(funcName)s LINE:%(lineno)d: %(message)s"
+)
 c_handler.setFormatter(c_format)
 logger.addHandler(c_handler)
 
 # Syslog
 # Only add syslog handler if /dev/log exists (not available in Docker containers)
-if sys.platform == "linux" and os.path.exists('/dev/log'):
-  s_handler = logging.handlers.SysLogHandler(address='/dev/log')
-  # This setLevel determines which messages are processed by this handler (assuming it arrives from global logger)
-  s_handler.setLevel(logging.INFO)
-  s_format = logging.Formatter('%(name)s[%(process)d] %(levelname)s: '
-                               '%(asctime)s FUNCTION:%(funcName)s LINE:%(lineno)d: %(message)s',
-                               datefmt='%H:%M:%S')
-  s_handler.setFormatter(s_format)
-  logger.addHandler(s_handler)
+if sys.platform == "linux" and os.path.exists("/dev/log"):
+    s_handler = logging.handlers.SysLogHandler(address="/dev/log")
+    # This setLevel determines which messages are processed by this handler (assuming it arrives from global logger)
+    s_handler.setLevel(logging.INFO)
+    s_format = logging.Formatter(
+        "%(name)s[%(process)d] %(levelname)s: "
+        "%(asctime)s FUNCTION:%(funcName)s LINE:%(lineno)d: %(message)s",
+        datefmt="%H:%M:%S",
+    )
+    s_handler.setFormatter(s_format)
+    logger.addHandler(s_handler)
 
 
 # File
 # Test if /dev/shm is writable otherwise use /tmp
 try:
-  if os.access("/dev/shm", os.W_OK):
-    f_handler = logging.FileHandler(f"/dev/shm/{script}.{currentuser}.log", 'a')
-  else:
-    f_handler = logging.FileHandler(f"/tmp/{script}.{currentuser}.log", 'a')
+    if os.access("/dev/shm", os.W_OK):
+        f_handler = logging.FileHandler(f"/dev/shm/{script}.{currentuser}.log", "a")
+    else:
+        f_handler = logging.FileHandler(f"/tmp/{script}.{currentuser}.log", "a")
 
-  f_handler.setLevel(logging.ERROR)
-  f_format = logging.Formatter('%(name)s[%(process)d] %(levelname)s: '
-                               '%(asctime)s FUNCTION:%(funcName)s LINE:%(lineno)d: %(message)s',
-                               datefmt='%Y-%m-%d,%H:%M:%S')
-  f_handler.setFormatter(f_format)
-  logger.addHandler(f_handler)
+    f_handler.setLevel(logging.ERROR)
+    f_format = logging.Formatter(
+        "%(name)s[%(process)d] %(levelname)s: "
+        "%(asctime)s FUNCTION:%(funcName)s LINE:%(lineno)d: %(message)s",
+        datefmt="%Y-%m-%d,%H:%M:%S",
+    )
+    f_handler.setFormatter(f_format)
+    logger.addHandler(f_handler)
 except Exception as e:
-  print(f"Exception {e}: /dev/shm/{script}.log permission denied")
+    print(f"Exception {e}: /dev/shm/{script}.log permission denied")
 
 # logger.debug('This is a debug message')
 # logger.info('This is an info message')

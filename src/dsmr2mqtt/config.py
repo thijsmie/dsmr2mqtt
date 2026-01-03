@@ -1,16 +1,16 @@
 """
-  Configuration for dsmr2mqtt
+Configuration for dsmr2mqtt
 
-  This module reads configuration from environment variables with sensible defaults.
-  For Docker deployments, set environment variables instead of editing this file.
+This module reads configuration from environment variables with sensible defaults.
+For Docker deployments, set environment variables instead of editing this file.
 
-  Configure:
-  - MQTT client
-  - Home Assistant Discovery
-  - USB P1 serial port
-  - Debug level
+Configure:
+- MQTT client
+- Home Assistant Discovery
+- USB P1 serial port
+- Debug level
 
-  Configure the DSMR messages in dsmr50.py
+Configure the DSMR messages in dsmr50.py
 
 """
 
@@ -23,7 +23,7 @@ def _get_bool_env(name, default):
     value = os.environ.get(name)
     if value is None:
         return default
-    return value.lower() in ('true', '1', 'yes', 'on')
+    return value.lower() in ("true", "1", "yes", "on")
 
 
 def _get_int_env(name, default):
@@ -55,22 +55,24 @@ def _parse_mqtt_url(url):
 
     # Map scheme to transport and defaults
     scheme_config = {
-        'mqtt': {'transport': 'tcp', 'default_port': 1883, 'use_tls': False},
-        'mqtts': {'transport': 'tcp', 'default_port': 8883, 'use_tls': True},
-        'ws': {'transport': 'websockets', 'default_port': 80, 'use_tls': False},
-        'wss': {'transport': 'websockets', 'default_port': 443, 'use_tls': True},
+        "mqtt": {"transport": "tcp", "default_port": 1883, "use_tls": False},
+        "mqtts": {"transport": "tcp", "default_port": 8883, "use_tls": True},
+        "ws": {"transport": "websockets", "default_port": 80, "use_tls": False},
+        "wss": {"transport": "websockets", "default_port": 443, "use_tls": True},
     }
 
     if scheme not in scheme_config:
-        raise ValueError(f"Unsupported MQTT URL scheme: {scheme}. "
-                         f"Supported schemes: mqtt://, mqtts://, ws://, wss://")
+        raise ValueError(
+            f"Unsupported MQTT URL scheme: {scheme}. "
+            f"Supported schemes: mqtt://, mqtts://, ws://, wss://"
+        )
 
     config = scheme_config[scheme]
-    host = parsed.hostname or '192.168.1.1'
-    port = parsed.port or config['default_port']
+    host = parsed.hostname or "192.168.1.1"
+    port = parsed.port or config["default_port"]
     path = parsed.path if parsed.path else None
 
-    return host, port, config['transport'], config['use_tls'], path
+    return host, port, config["transport"], config["use_tls"], path
 
 
 # [ LOGLEVELS ]

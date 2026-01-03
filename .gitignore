@@ -33,3 +33,8 @@ wheels/
 .vscode/
 *.swp
 *.swo
+
+# Linting and type checking cache
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/

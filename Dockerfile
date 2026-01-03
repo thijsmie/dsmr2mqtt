@@ -4,26 +4,28 @@ LABEL org.opencontainers.image.source="https://github.com/thijsmie/dsmr2mqtt"
 LABEL org.opencontainers.image.description="MQTT client for Belgian and Dutch Smart Meter (DSMR)"
 LABEL org.opencontainers.image.licenses="GPL-3.0-or-later"
 
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
-
 WORKDIR /app
 
-# Copy project files
-COPY pyproject.toml uv.lock ./
-COPY *.py ./
-COPY log/ ./log/
-COPY mqtt/ ./mqtt/
-COPY test/ ./test/
+# Copy source files directly
+COPY src/dsmr2mqtt /app/dsmr2mqtt
+COPY test/ /app/test/
 
-# Install dependencies using uv (frozen to ensure reproducibility)
-RUN uv sync --frozen --no-dev --no-install-project
+# Install dependencies directly without using pyproject.toml build
+RUN pip install --no-cache-dir \
+    paho-mqtt>=2.0.0 \
+    pyserial>=3.5 \
+    persist-queue>=0.8.0 \
+    packaging>=23.0 \
+    structlog>=25.0.0
 
 # Create a non-root user for security
 RUN useradd --create-home --shell /bin/bash dsmr && \
     chown -R dsmr:dsmr /app
 
 USER dsmr
+
+# Add the app directory to Python path
+ENV PYTHONPATH=/app
 
 # Environment variables with defaults
 # MQTT Configuration
@@ -53,5 +55,5 @@ ENV DSMR_LOGLEVEL="INFO"
 ENV DSMR_PRODUCTION="true"
 ENV DSMR_SIMULATORFILE="test/dsmr.raw"
 
-# Run the application
-CMD ["uv", "run", "python", "dsmr-mqtt.py"]
+# Run the application using python -m
+CMD ["python", "-m", "dsmr2mqtt"]
