@@ -12,20 +12,7 @@ services:
       timeout: 3s
       retries: 3
 
-  # Virtual USB device that emulates a DSMR meter
-  virtual-usb:
-    image: alpine:3.19
-    command: >
-      sh -c "
-        apk add --no-cache socat &&
-        socat -d -d pty,link=/dev/ttyUSB0,raw,echo=0 exec:'sh -c \"while true; do cat /data/dsmr.raw; sleep 1; done\"',pty,raw,echo=0
-      "
-    volumes:
-      - ./test:/data
-      - usb-device:/dev
-    privileged: true
-
-  # The dsmr2mqtt application
+  # The dsmr2mqtt application in simulation mode
   dsmr2mqtt:
     build:
       context: .
@@ -33,8 +20,6 @@ services:
     depends_on:
       mqtt:
         condition: service_healthy
-      virtual-usb:
-        condition: service_started
     environment:
       - MQTT_BROKER=mqtt
       - MQTT_PORT=1883
@@ -42,14 +27,10 @@ services:
       - MQTT_PASSWORD=
       - MQTT_TOPIC_PREFIX=dsmr
       - HA_DISCOVERY=true
-      - SERIAL_PORT=/dev/ttyUSB0
-      - SERIAL_BAUDRATE=115200
       - DSMR_LOGLEVEL=INFO
-      - DSMR_PRODUCTION=true
+      - DSMR_PRODUCTION=false
+      - DSMR_SIMULATORFILE=test/dsmr.raw
       - DSMR_LOG_FORMAT=JSON
-    volumes:
-      - usb-device:/dev
-    privileged: true
 
   # Test container that validates the e2e functionality
   test:
@@ -76,6 +57,3 @@ services:
           exit 1;
         fi
       "
-
-volumes:
-  usb-device:
