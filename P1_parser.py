@@ -25,7 +25,13 @@ import json
 import config as cfg
 import dsmr50 as dsmr
 
-from log import logger, stats_logger
+# Logging
+import __main__
+import logging
+import os
+script = os.path.basename(__main__.__file__)
+script = os.path.splitext(script)[0]
+logger = logging.getLogger(script + "." + __name__)
 
 
 class ParseTelegrams(threading.Thread):
@@ -40,7 +46,7 @@ class ParseTelegrams(threading.Thread):
       :param mqtt.mqttclient() mqtt: reference to mqtt worker
       :param list() telegram: dsmr telegram
     """
-    logger.debug("parser_init_started")
+    logger.debug(">>")
     super().__init__()
     self.__trigger = trigger
     self.__stopper = stopper
@@ -56,10 +62,10 @@ class ParseTelegrams(threading.Thread):
     # timestamp key:value topic
     self.__nroftopics = 1
 
-    logger.debug("parser_init_completed", nrof_topics=self.__nroftopics)
+    logger.debug(f"NROF = {self.__nroftopics}")
 
   def __del__(self):
-    logger.debug("parser_destroyed")
+    logger.debug(">>")
 
   def __publish_telegram(self, listofjsondicts):
     # publish the dictionaries per topic
@@ -123,8 +129,7 @@ class ParseTelegrams(threading.Thread):
             dictionary[tag] = data
 
     except Exception as e:
-      logger.debug("decode_element_error", error=str(e), index=index)
-      stats_logger.increment("parse_errors")
+      logger.debug(f"Exception {e}")
       pass
 
   def __decode_telegrams(self, telegram):
@@ -135,7 +140,7 @@ class ParseTelegrams(threading.Thread):
     Returns:
 
     """
-    logger.debug("decode_telegrams_started")
+    logger.debug(f">>")
 
     # list of dictionaries of mqtt messages which will be converted to json format
     listofjsondicts = list()
@@ -157,19 +162,19 @@ class ParseTelegrams(threading.Thread):
           self.__decode_telegram_element(index, element, ts, listofjsondicts)
 
         except Exception as e:
+          logger.debug(f"Exception {e}")
           # To handle empty lines or lines not matching dsmr definitions (checksum, header, empty line)
           pass
 
-      logger.debug("telegram_decoded", topics_count=len(listofjsondicts))
-      stats_logger.increment("telegrams_parsed")
+      logger.debug(f"DICT = {listofjsondicts}")
 
       self.__publish_telegram(listofjsondicts)
     else:
-      logger.debug("telegram_skipped", elapsed_seconds=(ts - self.__prev_ts))
+      logger.debug(f"Telegram is skipped; time elapsed since last MQTT message = {(ts - self.__prev_ts)}")
     return
 
   def run(self):
-    logger.debug("parser_thread_started")
+    logger.debug(">>")
 
     while not self.__stopper.is_set():
       # block till event is set, but implement timeout to allow stopper
@@ -186,4 +191,4 @@ class ParseTelegrams(threading.Thread):
 
         self.__decode_telegrams(telegram)
 
-    logger.debug("parser_thread_stopped")
+    logger.debug("<<")

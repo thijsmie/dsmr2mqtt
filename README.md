@@ -213,31 +213,8 @@ Examples:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DSMR_LOGLEVEL` | `INFO` | Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
-| `DSMR_LOG_FORMAT` | `JSON` | Log format: `JSON` for structured JSON logs (recommended for production), `TEXT` for human-readable console output |
-| `DSMR_STATS_LOG_INTERVAL` | `300` | Interval in seconds for logging statistics (0 to disable). Default is 300 (5 minutes) |
 | `DSMR_PRODUCTION` | `true` | Set to `false` to use simulation file instead of serial port |
 | `DSMR_SIMULATORFILE` | `test/dsmr.raw` | Path to simulation file (used when DSMR_PRODUCTION=false) |
-
-### Logging
-
-The application uses structured logging with configurable output format:
-
-- **JSON format** (default): Produces machine-parseable JSON logs, ideal for log aggregation systems like Elasticsearch, Splunk, or CloudWatch.
-- **TEXT format**: Human-readable console output for development and debugging.
-
-Example JSON log output:
-```json
-{"logger": "dsmr2mqtt", "event": "application_started", "file": "dsmr-mqtt.py", "version": "4.0.2", "level": "info", "timestamp": "2025-01-01T12:00:00.000000Z"}
-{"logger": "dsmr2mqtt", "event": "statistics", "telegrams_received": 100, "telegrams_parsed": 95, "mqtt_messages_sent": 285, "mqtt_errors": 0, "parse_errors": 5, "serial_errors": 0, "level": "info", "timestamp": "2025-01-01T12:05:00.000000Z"}
-```
-
-Statistics are logged at a configurable interval (default: every 5 minutes) and include:
-- `telegrams_received`: Number of telegrams received from the smart meter
-- `telegrams_parsed`: Number of telegrams successfully parsed
-- `mqtt_messages_sent`: Number of MQTT messages published
-- `mqtt_errors`: Number of MQTT publishing errors
-- `parse_errors`: Number of parsing errors
-- `serial_errors`: Number of serial port errors
 
 ### Docker Compose Example
 
