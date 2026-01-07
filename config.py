@@ -77,15 +77,6 @@ def _parse_mqtt_url(url):
 # DEBUG, INFO, WARNING, ERROR, CRITICAL
 loglevel = os.environ.get("DSMR_LOGLEVEL", "INFO")
 
-# [ LOG FORMAT ]
-# JSON for structured JSON logs, TEXT for human-readable console logs
-LOG_FORMAT = os.environ.get("DSMR_LOG_FORMAT", "JSON")
-
-# [ STATISTICS LOGGING INTERVAL ]
-# Interval in seconds for logging statistics (default: 300 = 5 minutes)
-# Set to 0 to disable statistics logging
-STATS_LOG_INTERVAL = _get_int_env("DSMR_STATS_LOG_INTERVAL", 300)
-
 # [ PRODUCTION ]
 # True if run in production
 # False when running in simulation

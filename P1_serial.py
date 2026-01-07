@@ -33,7 +33,13 @@ import re
 
 import config as cfg
 
-from log import logger, stats_logger
+# Logging
+import __main__
+import logging
+import os
+script = os.path.basename(__main__.__file__)
+script = os.path.splitext(script)[0]
+logger = logging.getLogger(script + "." + __name__)
 
 
 class TaskReadSerial(threading.Thread):
@@ -47,7 +53,7 @@ class TaskReadSerial(threading.Thread):
       :param list() telegram: dsmr telegram
     """
 
-    logger.debug("serial_init_started")
+    logger.debug(">>")
     super().__init__()
     self.__trigger = trigger
     self.__stopper = stopper
@@ -65,23 +71,22 @@ class TaskReadSerial(threading.Thread):
       self.__tty.xonxoff = 0
       self.__tty.rtscts = 0
       self.__tty.timeout = 20
-      logger.info("serial_port_configured", port=self.__tty.port, baudrate=self.__tty.baudrate)
+      logger.info(f"Using USB device {self.__tty.port} with baud {self.__tty.baudrate}")
 
     try:
       if cfg.PRODUCTION:
         self.__tty.open()
-        logger.debug("serial_port_opened", port=self.__tty.port)
+        logger.debug(f"serial {self.__tty.port} opened")
       else:
         self.__tty = open(cfg.SIMULATORFILE, 'rb')
 
     except Exception as e:
-      logger.error("serial_port_open_failed", error_type=type(e).__name__, error=str(e), port=cfg.ser_port)
-      stats_logger.increment("serial_errors")
+      logger.error(f"ReadSerial: {type(e).__name__}: {str(e)}")
       self.__stopper.set()
       raise ValueError('Cannot open P1 serial port', cfg.ser_port)
 
   def __del__(self):
-    logger.debug("serial_destroyed")
+    logger.debug(">>")
 
   def __preprocess(self):
     """
@@ -147,7 +152,7 @@ class TaskReadSerial(threading.Thread):
     Returns:
       None
     """
-    logger.debug("read_serial_started")
+    logger.debug(">>")
 
     while not self.__stopper.is_set():
 
@@ -170,18 +175,16 @@ class TaskReadSerial(threading.Thread):
         self.__telegram.append(line)
         line = self.__tty.readline().decode('utf-8').rstrip()
         nrof_elements += 1
+#        logger.debug(f"TELEGRAM Element = {line}")
 
         # Only in simulator mode; detect EOF in file
         if (not cfg.PRODUCTION) and line.startswith('EOF'):
           self.__stopper.set()
-          logger.debug("simulator_eof_detected", file=cfg.SIMULATORFILE)
+          logger.debug(f"EOF Detected in {cfg.SIMULATORFILE}")
           break
 
       # do some magic on telegram
       self.__preprocess()
-
-      # Track telegram received
-      stats_logger.increment("telegrams_received")
 
       # Trigger that new telegram is available for MQTT
       self.__trigger.set()
@@ -191,21 +194,20 @@ class TaskReadSerial(threading.Thread):
         # 1sec delay mimics dsmr behaviour, which transmits every 1sec a telegram
         time.sleep(1.0)
 
-    logger.debug("read_serial_stopped")
+    logger.debug("<<")
 
   def run(self):
-    logger.debug("serial_thread_started")
+    logger.debug(">>")
     try:
       # In production, ReadSerial has infinite loop
       # In simulation, ReadSerial will return @ EOF
       self.__read_serial()
 
     except Exception as e:
-      logger.error("serial_thread_exception", error=str(e))
-      stats_logger.increment("serial_errors")
+      logger.error(f"Exception: {e}")
 
     finally:
       self.__tty.close()
       self.__stopper.set()
 
-    logger.debug("serial_thread_stopped")
+    logger.debug("<<")
