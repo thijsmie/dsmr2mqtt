@@ -118,18 +118,21 @@ class Discovery(threading.Thread):
             # https://developers.home-assistant.io/docs/core/entity/sensor/#available-device-classes
             # https://www.home-assistant.io/integrations/sensor/
             # https://developers.home-assistant.io/docs/core/entity/sensor/#long-term-statistics
-            if d["unit_of_measurement"] == "Wh":
+            if d["unit_of_measurement"] in ["Wh", "kWh", "MWh", "GWh"]:
               d["device_class"] = "energy"
               d["state_class"] = "total"
-            elif d["unit_of_measurement"] == "W":
+            elif d["unit_of_measurement"] in ["W", "kW", "Watt"]:
+              # Normalize non-standard unit names to Home Assistant standard
+              if d["unit_of_measurement"] == "Watt":
+                d["unit_of_measurement"] = "W"
               d["device_class"] = "power"
-#              d["state_class"] = "measurement"
+              d["state_class"] = "measurement"
             elif d["unit_of_measurement"] == "A":
               d["device_class"] = "current"
-#              d["state_class"] = "measurement"
+              d["state_class"] = "measurement"
             elif d["unit_of_measurement"] == "V":
               d["device_class"] = "voltage"
-#              d["state_class"] = "measurement"
+              d["state_class"] = "measurement"
             elif d["unit_of_measurement"] == "m3" or d["unit_of_measurement"] == "m\u00b3":
               d["device_class"] = "gas"
               d["state_class"] = "total"
