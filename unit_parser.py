@@ -18,8 +18,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import pint
 from typing import Optional, Tuple
+import pint
+from pint.errors import UndefinedUnitError, DefinitionSyntaxError
 
 # Logging
 import __main__
@@ -96,14 +97,13 @@ def parse_unit(unit_str: str) -> Tuple[Optional[str], Optional[str], str]:
     
     try:
         # Handle special cases for non-standard unit names
-        normalized_input = unit_str
-        if unit_str.lower() == "watt":
-            normalized_input = "watt"  # pint knows this
+        # pint understands 'watt' in lowercase
+        normalized_input = unit_str.lower() if unit_str.lower() == "watt" else unit_str
         
         # Parse the unit
         try:
             unit = ureg.parse_expression(normalized_input)
-        except (pint.UndefinedUnitError, pint.errors.DefinitionSyntaxError):
+        except (UndefinedUnitError, DefinitionSyntaxError):
             # Try common alternatives
             if unit_str in ["m3", "m³"]:
                 unit = ureg.parse_expression("meter**3")
