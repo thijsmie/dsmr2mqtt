@@ -123,6 +123,7 @@ class Discovery(threading.Thread):
               d["state_class"] = "total"
             elif d["unit_of_measurement"] in ["W", "kW", "Watt"]:
               # Normalize non-standard unit names to Home Assistant standard
+              # HA accepts both W and kW for power, but "Watt" needs normalization to "W"
               if d["unit_of_measurement"] == "Watt":
                 d["unit_of_measurement"] = "W"
               d["device_class"] = "power"
