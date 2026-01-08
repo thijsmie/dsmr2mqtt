@@ -25,6 +25,7 @@ dependencies = [
     "pyserial>=3.5",
     "persist-queue>=0.8.0",
     "packaging>=23.0",
+    "pint>=0.24",
 ]
 
 [project.urls]

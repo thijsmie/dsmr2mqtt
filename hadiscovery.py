@@ -24,6 +24,7 @@ import re
 # Local imports
 import config as cfg
 import dsmr50 as dsmr
+import unit_parser
 
 # Logging
 import __main__
@@ -113,29 +114,21 @@ class Discovery(threading.Thread):
 
             d["value_template"] = "{{ value_json." + tag_matches[i] + " }}"
 
-            # Define here all the units that are measured by the meter and that are
-            # supported in HA as available device classes
+            # Use unit parser to determine device class and state class
             # https://developers.home-assistant.io/docs/core/entity/sensor/#available-device-classes
             # https://www.home-assistant.io/integrations/sensor/
             # https://developers.home-assistant.io/docs/core/entity/sensor/#long-term-statistics
-            if d["unit_of_measurement"] == "Wh":
-              d["device_class"] = "energy"
-              d["state_class"] = "total"
-            elif d["unit_of_measurement"] == "W":
-              d["device_class"] = "power"
-#              d["state_class"] = "measurement"
-            elif d["unit_of_measurement"] == "A":
-              d["device_class"] = "current"
-#              d["state_class"] = "measurement"
-            elif d["unit_of_measurement"] == "V":
-              d["device_class"] = "voltage"
-#              d["state_class"] = "measurement"
-            elif d["unit_of_measurement"] == "m3" or d["unit_of_measurement"] == "m\u00b3":
-              d["device_class"] = "gas"
-              d["state_class"] = "total"
-
-              # Homeassistant expects m3 and not liters
-              d["value_template"] = "{{value_json." + tag_matches[i] + "|float/1000|round(0)" + "}}"
+            device_class, state_class, normalized_unit = unit_parser.parse_unit(d["unit_of_measurement"])
+            
+            if device_class:
+              d["device_class"] = device_class
+              d["unit_of_measurement"] = normalized_unit
+              if state_class:
+                d["state_class"] = state_class
+              
+              # Special handling for gas: HA expects m3 and not liters
+              if device_class == "gas":
+                d["value_template"] = "{{value_json." + tag_matches[i] + "|float/1000|round(0)" + "}}"
             else:
               logger.debug(f"Unknown unit_of_measurement = {d['unit_of_measurement']}")
 
